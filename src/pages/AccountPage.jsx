@@ -1,5 +1,6 @@
 import React from "react";
 import Preloader from "../helper/Preloader";
+import HeaderOne from "../components/HeaderOne";
 import Breadcrumb from "../components/Breadcrumb";
 import BottomFooter from "../components/BottomFooter";
 import ShippingOne from "../components/ShippingOne";
@@ -9,8 +10,6 @@ import ColorInit from "../helper/ColorInit";
 
 
 const AccountPage = () => {
-
-
 
   return (
     <>
@@ -22,6 +21,9 @@ const AccountPage = () => {
 
       {/* Preloader */}
       <Preloader />
+
+      {/* Header */}
+      <HeaderOne />
 
       {/* Breadcrumb */}
       <Breadcrumb title={"Account"} />

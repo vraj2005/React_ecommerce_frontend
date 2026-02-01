@@ -1,10 +1,12 @@
 // src/components/OrderConfirmation.js
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import api from "../services/api"; // Assuming this is your API client
+import api from "../services/api";
+import HeaderOne from "./HeaderOne";
+import BottomFooter from "./BottomFooter";
 
 const OrderConfirmation = () => {
-  const { id } = useParams(); // Get orderId from URL
+  const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,31 +28,41 @@ const OrderConfirmation = () => {
 
   if (loading) {
     return (
-      <section className="order-confirmation py-80">
-        <div className="container container-lg">
-          <div className="text-center">Loading...</div>
-        </div>
-      </section>
+      <>
+        <HeaderOne />
+        <section className="order-confirmation py-80">
+          <div className="container container-lg">
+            <div className="text-center">Loading...</div>
+          </div>
+        </section>
+        <BottomFooter />
+      </>
     );
   }
 
   if (error) {
     return (
-      <section className="order-confirmation py-80">
-        <div className="container container-lg">
-          <div className="alert alert-danger text-center">{error}</div>
-          <div className="text-center">
-            <Link to="/" className="btn btn-main mt-20">
-              Return to Home
-            </Link>
+      <>
+        <HeaderOne />
+        <section className="order-confirmation py-80">
+          <div className="container container-lg">
+            <div className="alert alert-danger text-center">{error}</div>
+            <div className="text-center">
+              <Link to="/" className="btn btn-main mt-20">
+                Return to Home
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+        <BottomFooter />
+      </>
     );
   }
 
   return (
-    <section className="order-confirmation py-80">
+    <>
+      <HeaderOne />
+      <section className="order-confirmation py-80">
       <div className="container container-lg">
         <div className="text-center mb-40">
           <h2 className="text-2xl fw-bold text-gray-900">Thank You for Your Order!</h2>
@@ -118,6 +130,8 @@ const OrderConfirmation = () => {
         </div>
       </div>
     </section>
+    <BottomFooter />
+    </>
   );
 };
 

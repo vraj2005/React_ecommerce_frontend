@@ -1,7 +1,9 @@
 import React from "react";
 import Preloader from "../helper/Preloader";
+import HeaderOne from "../components/HeaderOne";
 import Breadcrumb from "../components/Breadcrumb";
 import ShopSection from "../components/ShopSection";
+import BottomFooter from "../components/BottomFooter";
 import ColorInit from "../helper/ColorInit";
 import ScrollToTop from "react-scroll-to-top";
 
@@ -18,13 +20,17 @@ const ShopPage = () => {
       {/* Preloader */}
       <Preloader />
 
+      {/* Header */}
+      <HeaderOne />
+
       {/* Breadcrumb */}
       <Breadcrumb title={"Shop"} />
 
       {/* ShopSection */}
       <ShopSection />
 
-
+      {/* Footer */}
+      <BottomFooter />
     </>
   );
 };

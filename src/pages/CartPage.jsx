@@ -1,6 +1,7 @@
 import React from "react";
 import Preloader from "../helper/Preloader";
 import ColorInit from "../helper/ColorInit";
+import HeaderOne from "../components/HeaderOne";
 import Breadcrumb from "../components/Breadcrumb";
 import BottomFooter from "../components/BottomFooter";
 import CartSection from "../components/CartSection";
@@ -9,8 +10,6 @@ import ScrollToTop from "react-scroll-to-top";
 
 
 const CartPage = () => {
-
-
 
   return (
     <>
@@ -22,6 +21,9 @@ const CartPage = () => {
 
       {/* Preloader */}
       <Preloader />
+
+      {/* Header */}
+      <HeaderOne />
 
       {/* Breadcrumb */}
       <Breadcrumb title={"Cart"} />
