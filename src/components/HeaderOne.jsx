@@ -7,7 +7,6 @@ import { fetchCart } from '../redux/slices/cartSlice';
 const HeaderOne = ({ searchQuery = '', setSearchQuery = () => {}, products = [] }) => {
   const [scroll, setScroll] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -18,7 +17,7 @@ const HeaderOne = ({ searchQuery = '', setSearchQuery = () => {}, products = [] 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
-  const { items, status } = useSelector((state) => state.cart);
+  const { items } = useSelector((state) => state.cart);
   const cartCount = items.length;
 
   // Fetch categories and user data

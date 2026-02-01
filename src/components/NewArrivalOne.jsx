@@ -1,168 +1,412 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import Slider from 'react-slick';
-
-// Custom arrow components
-function SampleNextArrow(props) {
-  const { className, onClick } = props;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${className} slick-next slick-arrow flex-center rounded-circle border border-gray-100 hover-border-main-600 text-xl hover-bg-main-600 hover-text-white transition-1`}
-    >
-      <i className="ph ph-caret-right" />
-    </button>
-  );
-}
-
-function SamplePrevArrow(props) {
-  const { className, onClick } = props;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${className} slick-prev slick-arrow flex-center rounded-circle border border-gray-100 hover-border-main-600 text-xl hover-bg-main-600 hover-text-white transition-1`}
-    >
-      <i className="ph ph-caret-left" />
-    </button>
-  );
-}
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { addToCart } from '../redux/slices/cartSlice';
+import api from '../services/api';
 
 const NewArrivalOne = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Slider settings
-  const settings = {
-    dots: false,
-    arrows: true,
-    infinite: true,
-    speed: 1000,
-    slidesToShow: 6,
-    slidesToScroll: 1,
-    initialSlide: 0,
-    autoplay: true,
-    nextArrow: <SampleNextArrow />,
-    prevArrow: <SamplePrevArrow />,
-    responsive: [
-      { breakpoint: 1599, settings: { slidesToShow: 6 } },
-      { breakpoint: 1399, settings: { slidesToShow: 4 } },
-      { breakpoint: 992, settings: { slidesToShow: 3 } },
-      { breakpoint: 575, settings: { slidesToShow: 2 } },
-      { breakpoint: 424, settings: { slidesToShow: 1 } },
-    ],
-  };
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const token = localStorage.getItem('token');
 
-  // Fetch new arrivals
   useEffect(() => {
-    const fetchNewArrivals = async () => {
+    const fetchProducts = async () => {
       try {
-        console.log('Fetching products from API...');
-        const response = await fetch('http://localhost:5000/api/products');
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-        console.log('API Products:', data);
+        const response = await api.get('/products');
+        const productData = response.data.products || response.data || [];
+        
+        // Get newest products sorted by createdAt
+        const newArrivals = productData
+          .filter(p => p.isActive)
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+          .slice(0, 8);
 
-        // Filter active products
-        const activeProducts = data.filter((product) => product.isActive === true);
-
-        // Sort by createdAt (if available) or assume last added, take top 10
-        const newArrivals = activeProducts
-          .sort((a, b) => new Date(b.createdAt || b._id) - new Date(a.createdAt || a._id)) // Fallback to _id if no createdAt
-          .slice(0, 10); // Limit to 10 for slider
-
-        console.log('New Arrivals:', newArrivals);
         setProducts(newArrivals);
         setLoading(false);
       } catch (err) {
-        console.error('Fetch Error:', err);
-        setError(err.message);
+        console.error('Error fetching products:', err);
         setLoading(false);
       }
     };
-    fetchNewArrivals();
+    fetchProducts();
   }, []);
 
-  // Render product card
-  const renderProductCard = (product) => (
-    <div key={product._id}>
-      <div className="product-card px-8 py-16 border border-gray-100 hover-border-main-600 rounded-16 position-relative transition-2">
-        <Link to={`/product-details/${product._id}`} className="product-card__thumb flex-center">
-          <img src={product.images?.[0] || 'https://via.placeholder.com/150'} alt={product.name || 'Product'} />
-        </Link>
-        <div className="product-card__content mt-12">
-          <div className="flex-align gap-6">
-            <span className="text-xs fw-bold text-gray-500">{product.rating || 4.8}</span>
-            <span className="text-15 fw-bold text-warning-600 d-flex">
-              <i className="ph-fill ph-star" />
-            </span>
-            <span className="text-xs fw-bold text-gray-500">({product.reviews || '17k'})</span>
-          </div>
-          <h6 className="title text-lg fw-semibold mt-12 mb-8">
-            <Link to={`/product-details/${product._id}`} className="link text-line-2">
-              {product.name || 'Unnamed Product'}
-            </Link>
-          </h6>
-          <div className="flex-align gap-4">
-            <span className="text-main-600 text-md d-flex">
-              <i className="ph-fill ph-storefront" />
-            </span>
-            <span className="text-gray-500 text-xs">By Lucky Supermarket</span>
-          </div>
-          <div className="flex-between gap-8 mt-24 flex-wrap">
-            <div className="product-card__price">
-              {product.discountPrice && (
-                <span className="text-gray-400 text-md fw-semibold text-decoration-line-through d-block">
-                  ${product.price.toFixed(2)}
-                </span>
-              )}
-              <span className="text-heading text-md fw-semibold">
-                ${(product.discountPrice || product.price).toFixed(2)}{' '}
-                <span className="text-gray-500 fw-normal">/Qty</span>
-              </span>
-            </div>
-            <Link
-              to="/cart"
-              className="product-card__cart btn btn-main py-11 px-24 rounded-pill flex-align gap-8"
-            >
-              Add <i className="ph ph-shopping-cart" />
-            </Link>
-          </div>
+  const handleAddToCart = async (productId) => {
+    if (!token) {
+      navigate('/account');
+      return;
+    }
+    try {
+      await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
+    } catch (err) {
+      console.error('Add to Cart Error:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="new-arrival-section py-60">
+        <div className="container container-lg">
+          <div className="loading-spinner">Loading...</div>
         </div>
-      </div>
-    </div>
-  );
+      </section>
+    );
+  }
 
   return (
-    <section className="new-arrival pb-80">
+    <section className="new-arrival-section py-60">
       <div className="container container-lg">
-        <div className="section-heading">
-          <div className="flex-between flex-wrap gap-8">
-            <h5 className="mb-0">New Arrivals</h5>
-            <div className="flex-align mr-point gap-16">
-              <Link
-                to="/shop"
-                className="text-sm fw-medium text-gray-700 hover-text-main-600 hover-text-decoration-underline"
-              >
-                View All Deals
-              </Link>
-            </div>
+        {/* Section Header */}
+        <div className="section-header">
+          <div className="header-left">
+            <span className="section-badge">Just In</span>
+            <h2 className="section-title">New Arrivals</h2>
+            <p className="section-subtitle">Check out the latest products added to our store</p>
           </div>
+          <Link to="/shop" className="view-all-btn">
+            Shop All New <i className="ph ph-arrow-right"></i>
+          </Link>
         </div>
-        <div className="new-arrival__slider arrow-style-two">
-          {loading ? (
-            <div>Loading...</div>
-          ) : error ? (
-            <div>Error: {error}</div>
-          ) : products.length === 0 ? (
-            <div>No new arrivals found.</div>
-          ) : (
-            <Slider {...settings}>{products.map((product) => renderProductCard(product))}</Slider>
-          )}
+
+        {/* Products Grid */}
+        <div className="products-grid">
+          {products.map((product, index) => (
+            <div key={product._id} className={`product-card ${index === 0 ? 'featured' : ''}`}>
+              {index === 0 && <span className="new-badge">NEW</span>}
+              
+              <div className="card-image">
+                <Link to={`/product-details/${product._id}`}>
+                  <img
+                    src={product.images?.[0] || 'https://via.placeholder.com/300'}
+                    alt={product.name}
+                  />
+                </Link>
+                <div className="card-actions">
+                  <button 
+                    className="action-btn"
+                    onClick={() => handleAddToCart(product._id)}
+                    title="Add to Cart"
+                  >
+                    <i className="ph ph-shopping-cart"></i>
+                  </button>
+                  <Link 
+                    to={`/product-details/${product._id}`} 
+                    className="action-btn"
+                    title="Quick View"
+                  >
+                    <i className="ph ph-eye"></i>
+                  </Link>
+                </div>
+              </div>
+              
+              <div className="card-content">
+                <span className="product-category">{product.category?.name || 'Uncategorized'}</span>
+                <h3 className="product-name">
+                  <Link to={`/product-details/${product._id}`}>{product.name}</Link>
+                </h3>
+                <div className="product-footer">
+                  <div className="product-price">
+                    {product.discountPrice && product.discountPrice < product.price ? (
+                      <>
+                        <span className="current-price">${product.discountPrice.toFixed(2)}</span>
+                        <span className="original-price">${product.price.toFixed(2)}</span>
+                      </>
+                    ) : (
+                      <span className="current-price">${product.price?.toFixed(2)}</span>
+                    )}
+                  </div>
+                  <div className="product-rating">
+                    <i className="ph-fill ph-star"></i>
+                    <span>{product.rating || '4.5'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+
+      <style jsx="true">{`
+        .new-arrival-section {
+          background: #f8f9fa;
+        }
+
+        .section-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          margin-bottom: 40px;
+          flex-wrap: wrap;
+          gap: 20px;
+        }
+
+        .section-badge {
+          display: inline-block;
+          background: linear-gradient(135deg, #FF6B00, #ff9a5a);
+          color: #fff;
+          padding: 6px 16px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          margin-bottom: 12px;
+        }
+
+        .section-title {
+          font-size: 32px;
+          font-weight: 800;
+          color: #1a1a2e;
+          margin: 0 0 8px;
+        }
+
+        .section-subtitle {
+          color: #666;
+          font-size: 16px;
+          margin: 0;
+        }
+
+        .view-all-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #1a1a2e;
+          color: #fff;
+          padding: 14px 28px;
+          border-radius: 30px;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.3s;
+        }
+
+        .view-all-btn:hover {
+          background: #FF6B00;
+          transform: translateY(-2px);
+        }
+
+        .products-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 24px;
+        }
+
+        @media (max-width: 1199px) {
+          .products-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        @media (max-width: 991px) {
+          .products-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 575px) {
+          .products-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+        }
+
+        .product-card {
+          background: #fff;
+          border-radius: 16px;
+          overflow: hidden;
+          position: relative;
+          transition: all 0.3s;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .product-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .product-card.featured {
+          grid-column: span 2;
+          grid-row: span 2;
+        }
+
+        @media (max-width: 575px) {
+          .product-card.featured {
+            grid-column: span 1;
+            grid-row: span 1;
+          }
+        }
+
+        .new-badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          background: #10b981;
+          color: #fff;
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          z-index: 10;
+        }
+
+        .card-image {
+          position: relative;
+          background: #f8f9fa;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+
+        .product-card.featured .card-image {
+          height: 350px;
+        }
+
+        .product-card:not(.featured) .card-image {
+          height: 200px;
+        }
+
+        .card-image img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+          transition: transform 0.4s;
+        }
+
+        .product-card:hover .card-image img {
+          transform: scale(1.08);
+        }
+
+        .card-actions {
+          position: absolute;
+          bottom: -50px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          gap: 10px;
+          transition: all 0.3s;
+        }
+
+        .product-card:hover .card-actions {
+          bottom: 20px;
+        }
+
+        .action-btn {
+          width: 44px;
+          height: 44px;
+          background: #fff;
+          border: none;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #1a1a2e;
+          font-size: 18px;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+          transition: all 0.3s;
+          text-decoration: none;
+        }
+
+        .action-btn:hover {
+          background: #FF6B00;
+          color: #fff;
+        }
+
+        .card-content {
+          padding: 20px;
+        }
+
+        .product-category {
+          display: block;
+          color: #FF6B00;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 8px;
+        }
+
+        .product-name {
+          font-size: 16px;
+          font-weight: 600;
+          margin: 0 0 12px;
+          line-height: 1.4;
+        }
+
+        .product-card.featured .product-name {
+          font-size: 20px;
+        }
+
+        .product-name a {
+          color: #1a1a2e;
+          text-decoration: none;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .product-name a:hover {
+          color: #FF6B00;
+        }
+
+        .product-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .product-price {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .current-price {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1a1a2e;
+        }
+
+        .product-card.featured .current-price {
+          font-size: 22px;
+        }
+
+        .original-price {
+          font-size: 14px;
+          color: #999;
+          text-decoration: line-through;
+        }
+
+        .product-rating {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          color: #ffc107;
+          font-size: 14px;
+        }
+
+        .product-rating span {
+          color: #666;
+          font-weight: 600;
+        }
+
+        .loading-spinner {
+          text-align: center;
+          padding: 60px;
+          color: #666;
+          font-size: 18px;
+        }
+      `}</style>
     </section>
   );
 };
