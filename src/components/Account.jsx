@@ -9,6 +9,7 @@ const Account = () => {
   const dispatch = useDispatch();
   const { user, loading: authLoading, error: authError } = useSelector((state) => state.auth);
 
+  const [activeTab, setActiveTab] = useState('login');
   const [loginData, setLoginData] = useState({
     email: '',
     password: '',
@@ -18,6 +19,8 @@ const Account = () => {
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
+    phone: '',
     address: {
       street: '',
       city: '',
@@ -25,11 +28,10 @@ const Account = () => {
       zip: '',
       country: '',
     },
-    phone: '',
   });
 
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(null);
   const [loginPassVisible, setLoginPassVisible] = useState(false);
   const [regPassVisible, setRegPassVisible] = useState(false);
 
@@ -37,87 +39,181 @@ const Account = () => {
   useEffect(() => {
     if (authError) {
       setError(authError);
+      setSuccess(null);
     }
   }, [authError]);
 
+  // Clear errors when switching tabs
+  useEffect(() => {
+    setError(null);
+    setSuccess(null);
+  }, [activeTab]);
+
   const handleLoginChange = (e) => {
-    const { id, value } = e.target;
-    setLoginData((prev) => ({ ...prev, [id]: value }));
-    // Clear error when user starts typing
+    const { name, value } = e.target;
+    setLoginData((prev) => ({ ...prev, [name]: value }));
     if (error) setError(null);
   };
 
   const handleRegisterChange = (e) => {
-    const { id, value } = e.target;
-    if (id.startsWith('address.')) {
-      const addressField = id.split('.')[1];
+    const { name, value } = e.target;
+    if (name.startsWith('address_')) {
+      const addressField = name.replace('address_', '');
       setRegisterData((prev) => ({
         ...prev,
         address: { ...prev.address, [addressField]: value },
       }));
     } else {
-      setRegisterData((prev) => ({ ...prev, [id]: value }));
+      setRegisterData((prev) => ({ ...prev, [name]: value }));
     }
-    // Clear error when user starts typing
     if (error) setError(null);
+  };
+
+  const validateLogin = () => {
+    if (!loginData.email.trim()) {
+      setError('Please enter your email address');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    if (!loginData.password) {
+      setError('Please enter your password');
+      return false;
+    }
+    return true;
+  };
+
+  const validateRegister = () => {
+    if (!registerData.name.trim()) {
+      setError('Please enter your full name');
+      return false;
+    }
+    if (!registerData.email.trim()) {
+      setError('Please enter your email address');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    if (!registerData.password) {
+      setError('Please enter a password');
+      return false;
+    }
+    if (registerData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+    if (registerData.password !== registerData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+    if (!registerData.phone.trim()) {
+      setError('Please enter your phone number');
+      return false;
+    }
+    if (!registerData.address.street.trim()) {
+      setError('Please enter your street address');
+      return false;
+    }
+    if (!registerData.address.city.trim()) {
+      setError('Please enter your city');
+      return false;
+    }
+    if (!registerData.address.state.trim()) {
+      setError('Please enter your state/province');
+      return false;
+    }
+    if (!registerData.address.zip.trim()) {
+      setError('Please enter your ZIP/postal code');
+      return false;
+    }
+    if (!registerData.address.country.trim()) {
+      setError('Please enter your country');
+      return false;
+    }
+    return true;
   };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
+
+    if (!validateLogin()) return;
 
     try {
       const result = await dispatch(login({
-        email: loginData.email,
+        email: loginData.email.trim().toLowerCase(),
         password: loginData.password,
       }));
       
       if (login.fulfilled.match(result)) {
-        // Login successful, component will re-render with user data
+        setSuccess('Login successful! Redirecting...');
         setLoginData({ email: '', password: '' });
+        setTimeout(() => navigate('/'), 1000);
+      } else if (login.rejected.match(result)) {
+        setError(result.payload || 'Login failed. Please check your credentials.');
       }
     } catch (err) {
       console.error('Login error:', err);
+      setError('An unexpected error occurred. Please try again.');
     }
   };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
+
+    if (!validateRegister()) return;
+
+    // Prepare data for API
+    const userData = {
+      name: registerData.name.trim(),
+      email: registerData.email.trim().toLowerCase(),
+      password: registerData.password,
+      phone: registerData.phone.trim(),
+      address: {
+        street: registerData.address.street.trim(),
+        city: registerData.address.city.trim(),
+        state: registerData.address.state.trim(),
+        zip: registerData.address.zip.trim(),
+        country: registerData.address.country.trim(),
+      },
+    };
 
     try {
-      const result = await dispatch(register(registerData));
+      const result = await dispatch(register(userData));
       
       if (register.fulfilled.match(result)) {
-        // Registration successful, component will re-render with user data
+        setSuccess('Registration successful! Welcome aboard!');
         setRegisterData({
           name: '',
           email: '',
           password: '',
-          address: {
-            street: '',
-            city: '',
-            state: '',
-            zip: '',
-            country: '',
-          },
+          confirmPassword: '',
           phone: '',
+          address: { street: '', city: '', state: '', zip: '', country: '' },
         });
+        setTimeout(() => navigate('/'), 1000);
+      } else if (register.rejected.match(result)) {
+        setError(result.payload || 'Registration failed. Please try again.');
       }
     } catch (err) {
       console.error('Register error:', err);
+      setError('An unexpected error occurred. Please try again.');
     }
   };
-
-  const toggleLoginPassVisibility = () => setLoginPassVisible((prev) => !prev);
-  const toggleRegPassVisibility = () => setRegPassVisible((prev) => !prev);
 
   const handleLogout = () => {
     dispatch(logout());
     navigate('/');
   };
 
-  // If user is logged in, show profile instead of login/register forms
+  // If user is logged in, show profile
   if (user) {
     return (
       <section className="profile-section py-80">
@@ -160,7 +256,6 @@ const Account = () => {
                     </button>
                   </div>
                 </div>
-                {/* Decorative Elements */}
                 <div className="position-absolute top-0 end-0 opacity-10">
                   <i className="ph ph-user-circle" style={{ fontSize: '120px' }}></i>
                 </div>
@@ -170,18 +265,13 @@ const Account = () => {
 
           {/* Profile Content */}
           <div className="row gy-24">
-            {/* Personal Information Card */}
             <div className="col-lg-8">
               <div className="profile-card bg-white border-0 rounded-24 p-32 shadow-sm h-100">
                 <div className="d-flex align-items-center justify-content-between mb-32">
                   <div>
                     <h4 className="mb-8 fw-bold text-neutral-900">Personal Information</h4>
-                    <p className="text-gray-500 mb-0">Manage your personal details and contact information</p>
+                    <p className="text-gray-500 mb-0">Manage your personal details</p>
                   </div>
-                  <button className="btn btn-outline-main btn-sm py-8 px-16">
-                    <i className="ph ph-pencil me-8"></i>
-                    Edit
-                  </button>
                 </div>
 
                 <div className="row gy-24">
@@ -189,7 +279,7 @@ const Account = () => {
                     <div className="info-item p-20 bg-gray-50 rounded-12">
                       <div className="d-flex align-items-center gap-12 mb-12">
                         <i className="ph ph-user text-main-600 text-xl"></i>
-                        <label className="text-sm fw-semibold text-gray-600 text-uppercase letter-spacing-1">Full Name</label>
+                        <label className="text-sm fw-semibold text-gray-600 text-uppercase">Full Name</label>
                       </div>
                       <p className="text-lg fw-medium text-neutral-900 mb-0">{user.name || 'Not provided'}</p>
                     </div>
@@ -199,7 +289,7 @@ const Account = () => {
                     <div className="info-item p-20 bg-gray-50 rounded-12">
                       <div className="d-flex align-items-center gap-12 mb-12">
                         <i className="ph ph-envelope text-main-600 text-xl"></i>
-                        <label className="text-sm fw-semibold text-gray-600 text-uppercase letter-spacing-1">Email Address</label>
+                        <label className="text-sm fw-semibold text-gray-600 text-uppercase">Email</label>
                       </div>
                       <p className="text-lg fw-medium text-neutral-900 mb-0">{user.email || 'Not provided'}</p>
                     </div>
@@ -210,204 +300,51 @@ const Account = () => {
                       <div className="info-item p-20 bg-gray-50 rounded-12">
                         <div className="d-flex align-items-center gap-12 mb-12">
                           <i className="ph ph-phone text-main-600 text-xl"></i>
-                          <label className="text-sm fw-semibold text-gray-600 text-uppercase letter-spacing-1">Phone Number</label>
+                          <label className="text-sm fw-semibold text-gray-600 text-uppercase">Phone</label>
                         </div>
                         <p className="text-lg fw-medium text-neutral-900 mb-0">{user.phone}</p>
                       </div>
                     </div>
                   )}
-
-                  <div className="col-md-6">
-                    <div className="info-item p-20 bg-gray-50 rounded-12">
-                      <div className="d-flex align-items-center gap-12 mb-12">
-                        <i className="ph ph-calendar text-main-600 text-xl"></i>
-                        <label className="text-sm fw-semibold text-gray-600 text-uppercase letter-spacing-1">Member Since</label>
-                      </div>
-                      <p className="text-lg fw-medium text-neutral-900 mb-0">
-                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Recently joined'}
-                      </p>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Address Information */}
-                {user.address && (Object.values(user.address).some(value => value)) && (
-                  <div className="mt-40">
-                    <div className="d-flex align-items-center justify-content-between mb-24">
-                      <h5 className="fw-bold text-neutral-900 mb-0">
-                        <i className="ph ph-map-pin text-main-600 me-12"></i>
-                        Address Information
-                      </h5>
-                      <button className="btn btn-outline-main btn-sm py-8 px-16">
-                        <i className="ph ph-pencil me-8"></i>
-                        Edit Address
-                      </button>
-                    </div>
-
+                {user.address && Object.values(user.address).some(v => v) && (
+                  <div className="mt-32">
+                    <h5 className="fw-bold text-neutral-900 mb-20">
+                      <i className="ph ph-map-pin text-main-600 me-12"></i>
+                      Address
+                    </h5>
                     <div className="address-card p-24 bg-gradient-light rounded-16 border border-gray-100">
-                      <div className="row gy-16">
-                        {user.address.street && (
-                          <div className="col-12">
-                            <div className="d-flex align-items-start gap-12">
-                              <i className="ph ph-road-horizon text-main-600 mt-4"></i>
-                              <div>
-                                <label className="text-sm fw-semibold text-gray-600 d-block">Street Address</label>
-                                <p className="text-neutral-900 mb-0">{user.address.street}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="col-md-6">
-                          {user.address.city && (
-                            <div className="d-flex align-items-start gap-12">
-                              <i className="ph ph-buildings text-main-600 mt-4"></i>
-                              <div>
-                                <label className="text-sm fw-semibold text-gray-600 d-block">City</label>
-                                <p className="text-neutral-900 mb-0">{user.address.city}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="col-md-6">
-                          {user.address.state && (
-                            <div className="d-flex align-items-start gap-12">
-                              <i className="ph ph-map-trifold text-main-600 mt-4"></i>
-                              <div>
-                                <label className="text-sm fw-semibold text-gray-600 d-block">State</label>
-                                <p className="text-neutral-900 mb-0">{user.address.state}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="col-md-6">
-                          {user.address.zip && (
-                            <div className="d-flex align-items-start gap-12">
-                              <i className="ph ph-hash text-main-600 mt-4"></i>
-                              <div>
-                                <label className="text-sm fw-semibold text-gray-600 d-block">ZIP Code</label>
-                                <p className="text-neutral-900 mb-0">{user.address.zip}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="col-md-6">
-                          {user.address.country && (
-                            <div className="d-flex align-items-start gap-12">
-                              <i className="ph ph-globe text-main-600 mt-4"></i>
-                              <div>
-                                <label className="text-sm fw-semibold text-gray-600 d-block">Country</label>
-                                <p className="text-neutral-900 mb-0">{user.address.country}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <p className="mb-0 text-neutral-900">
+                        {[user.address.street, user.address.city, user.address.state, user.address.zip, user.address.country]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Quick Actions Sidebar */}
             <div className="col-lg-4">
-              <div className="profile-sidebar">
-                {/* Quick Actions Card */}
-                <div className="profile-card bg-white border-0 rounded-24 p-32 shadow-sm mb-24">
-                  <h5 className="fw-bold text-neutral-900 mb-24">
-                    <i className="ph ph-lightning text-main-600 me-12"></i>
-                    Quick Actions
-                  </h5>
-
-                  <div className="d-grid gap-16">
-                    <Link 
-                      to="/orders" 
-                      className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20 text-start hover-bg-main hover-text-white transition-3"
-                    >
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-package text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">My Orders</div>
-                          <small className="opacity-75">Track your purchases</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </Link>
-
-                    <Link 
-                      to="/cart" 
-                      className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20 text-start hover-bg-main hover-text-white transition-3"
-                    >
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-shopping-cart text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">Shopping Cart</div>
-                          <small className="opacity-75">Review your items</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </Link>
-
-                    <Link 
-                      to="/shop" 
-                      className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20 text-start hover-bg-main hover-text-white transition-3"
-                    >
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-storefront text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">Continue Shopping</div>
-                          <small className="opacity-75">Explore products</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Account Security Card */}
-                <div className="profile-card bg-white border-0 rounded-24 p-32 shadow-sm">
-                  <h5 className="fw-bold text-neutral-900 mb-24">
-                    <i className="ph ph-shield-check text-main-600 me-12"></i>
-                    Account Security
-                  </h5>
-
-                  <div className="d-grid gap-16">
-                    <button className="btn btn-outline-secondary d-flex align-items-center justify-content-between py-16 px-20 text-start">
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-key text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">Change Password</div>
-                          <small className="text-gray-500">Update your password</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </button>
-
-                    <button className="btn btn-outline-secondary d-flex align-items-center justify-content-between py-16 px-20 text-start">
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-bell text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">Notifications</div>
-                          <small className="text-gray-500">Manage preferences</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </button>
-
-                    <button className="btn btn-outline-secondary d-flex align-items-center justify-content-between py-16 px-20 text-start">
-                      <div className="d-flex align-items-center gap-12">
-                        <i className="ph ph-gear text-xl"></i>
-                        <div>
-                          <div className="fw-semibold">Account Settings</div>
-                          <small className="text-gray-500">Privacy & preferences</small>
-                        </div>
-                      </div>
-                      <i className="ph ph-arrow-right"></i>
-                    </button>
-                  </div>
+              <div className="profile-card bg-white border-0 rounded-24 p-32 shadow-sm">
+                <h5 className="fw-bold text-neutral-900 mb-24">
+                  <i className="ph ph-lightning text-main-600 me-12"></i>
+                  Quick Actions
+                </h5>
+                <div className="d-grid gap-16">
+                  <Link to="/orders" className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20">
+                    <span><i className="ph ph-package me-12"></i>My Orders</span>
+                    <i className="ph ph-arrow-right"></i>
+                  </Link>
+                  <Link to="/cart" className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20">
+                    <span><i className="ph ph-shopping-cart me-12"></i>Cart</span>
+                    <i className="ph ph-arrow-right"></i>
+                  </Link>
+                  <Link to="/shop" className="btn btn-outline-main d-flex align-items-center justify-content-between py-16 px-20">
+                    <span><i className="ph ph-storefront me-12"></i>Shop</span>
+                    <i className="ph ph-arrow-right"></i>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -417,372 +354,389 @@ const Account = () => {
     );
   }
 
-  // If user is not logged in, show login/register forms
+  // Login/Register Forms
   return (
-    <section className="account py-80" style={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%)', minHeight: '80vh' }}>
+    <section className="account-section py-80" style={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%)', minHeight: '80vh' }}>
       <div className="container container-lg">
-        {/* Header */}
-        <div className="text-center mb-48">
-          <h2 className="text-3xl fw-bold text-neutral-900 mb-16">
-            Welcome to Your Account
-          </h2>
-          <p className="text-lg text-gray-600 mb-0">
-            Sign in to your account or create a new one to get started
-          </p>
-        </div>
-
-        {error && (
-          <div className="alert alert-danger rounded-16 mb-32 border-0 shadow-sm">
-            <i className="ph ph-warning-circle me-12"></i>
-            {error}
-          </div>
-        )}
-
-        <div className="row gy-32 justify-content-center">
-          {/* Login Card Start */}
-          <div className="col-xl-6 col-lg-7">
-            <form onSubmit={handleLoginSubmit}>
-              <div className="auth-card bg-white rounded-24 p-40 shadow-sm border-0 h-100 hover-lift">
-                <div className="text-center mb-32">
-                  <div className="auth-icon bg-gradient-main rounded-circle d-inline-flex align-items-center justify-content-center mb-24" 
-                       style={{ width: '80px', height: '80px' }}>
-                    <i className="ph ph-sign-in text-3xl text-white"></i>
-                  </div>
-                  <h3 className="fw-bold text-neutral-900 mb-12">Welcome Back</h3>
-                  <p className="text-gray-600 mb-0">Sign in to your account to continue</p>
-                </div>
-
-                <div className="mb-24">
-                  <label htmlFor="email" className="form-label text-neutral-900 fw-semibold mb-12">
-                    <i className="ph ph-envelope me-8 text-main-600"></i>
-                    Email Address <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16 focus-ring-main"
-                    id="email"
-                    placeholder="Enter your email address"
-                    value={loginData.email}
-                    onChange={handleLoginChange}
-                    required
-                    style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
-                  />
-                </div>
-
-                <div className="mb-32">
-                  <label htmlFor="password" className="form-label text-neutral-900 fw-semibold mb-12">
-                    <i className="ph ph-lock me-8 text-main-600"></i>
-                    Password <span className="text-danger">*</span>
-                  </label>
-                  <div className="position-relative">
-                    <input
-                      type={loginPassVisible ? 'text' : 'password'}
-                      className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16 pe-56"
-                      id="password"
-                      placeholder="Enter your password"
-                      value={loginData.password}
-                      onChange={handleLoginChange}
-                      required
-                      style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-link position-absolute top-50 end-0 translate-middle-y pe-20 text-gray-500 hover-text-main"
-                      onClick={toggleLoginPassVisibility}
-                      style={{ border: 'none', background: 'none' }}
-                    >
-                      <i className={`ph ph-${loginPassVisible ? 'eye-slash' : 'eye'} text-xl`}></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="d-flex align-items-center justify-content-between mb-32">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input rounded"
-                      type="checkbox"
-                      id="remember"
-                      style={{ borderColor: '#FA6400' }}
-                    />
-                    <label className="form-check-label text-gray-600 ms-8" htmlFor="remember">
-                      Remember me
-                    </label>
-                  </div>
-                  <Link
-                    to="#"
-                    className="text-main-600 fw-semibold text-decoration-none hover-text-decoration-underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <button 
-                  type="submit" 
-                  className="btn btn-main btn-lg w-100 py-16 fw-bold rounded-12 shadow-sm"
-                  disabled={authLoading}
-                  style={{ background: 'linear-gradient(135deg, #FA6400 0%, #FF8A3D 100%)' }}
-                >
-                  {authLoading ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-12"></span>
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      <i className="ph ph-sign-in me-12"></i>
-                      Sign In
-                    </>
-                  )}
-                </button>
-
-                <div className="text-center mt-24">
-                  <p className="text-gray-600 mb-0">
-                    Don't have an account? 
-                    <a href="#register" className="text-main-600 fw-semibold text-decoration-none ms-4">
-                      Create one now
-                    </a>
-                  </p>
-                </div>
+        <div className="row justify-content-center">
+          <div className="col-lg-6 col-md-8">
+            {/* Header */}
+            <div className="text-center mb-40">
+              <div className="auth-icon bg-gradient-main rounded-circle d-inline-flex align-items-center justify-content-center mb-24" 
+                   style={{ width: '80px', height: '80px' }}>
+                <i className={`ph ph-${activeTab === 'login' ? 'sign-in' : 'user-plus'} text-3xl text-white`}></i>
               </div>
-            </form>
-          </div>
-          {/* Login Card End */}
+              <h2 className="text-3xl fw-bold text-neutral-900 mb-12">
+                {activeTab === 'login' ? 'Welcome Back!' : 'Create Account'}
+              </h2>
+              <p className="text-gray-600 mb-0">
+                {activeTab === 'login' 
+                  ? 'Sign in to access your account' 
+                  : 'Join us today and start shopping'}
+              </p>
+            </div>
 
-          {/* Register Card Start */}
-          <div className="col-xl-6 col-lg-7">
-            <form onSubmit={handleRegisterSubmit} id="register">
-              <div className="auth-card bg-white rounded-24 p-40 shadow-sm border-0 hover-lift">
-                <div className="text-center mb-32">
-                  <div className="auth-icon bg-gradient-main rounded-circle d-inline-flex align-items-center justify-content-center mb-24" 
-                       style={{ width: '80px', height: '80px' }}>
-                    <i className="ph ph-user-plus text-3xl text-white"></i>
-                  </div>
-                  <h3 className="fw-bold text-neutral-900 mb-12">Create Account</h3>
-                  <p className="text-gray-600 mb-0">Join us today and start shopping</p>
-                </div>
+            {/* Tab Buttons */}
+            <div className="d-flex gap-12 mb-32">
+              <button
+                type="button"
+                className={`btn flex-grow-1 py-14 px-24 fw-semibold rounded-12 transition-3 ${
+                  activeTab === 'login' 
+                    ? 'btn-main text-white' 
+                    : 'btn-outline-main'
+                }`}
+                onClick={() => setActiveTab('login')}
+              >
+                <i className="ph ph-sign-in me-8"></i>
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`btn flex-grow-1 py-14 px-24 fw-semibold rounded-12 transition-3 ${
+                  activeTab === 'register' 
+                    ? 'btn-main text-white' 
+                    : 'btn-outline-main'
+                }`}
+                onClick={() => setActiveTab('register')}
+              >
+                <i className="ph ph-user-plus me-8"></i>
+                Register
+              </button>
+            </div>
 
-                <div className="row gy-24">
-                  <div className="col-12">
-                    <label htmlFor="name" className="form-label text-neutral-900 fw-semibold mb-12">
-                      <i className="ph ph-user me-8 text-main-600"></i>
-                      Full Name <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
-                      id="name"
-                      placeholder="Enter your full name"
-                      value={registerData.name}
-                      onChange={handleRegisterChange}
-                      required
-                      style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
-                    />
-                  </div>
+            {/* Alert Messages */}
+            {error && (
+              <div className="alert alert-danger rounded-12 mb-24 border-0 d-flex align-items-center gap-12">
+                <i className="ph ph-warning-circle text-xl"></i>
+                <span>{error}</span>
+                <button type="button" className="btn-close ms-auto" onClick={() => setError(null)}></button>
+              </div>
+            )}
 
-                  <div className="col-12">
-                    <label htmlFor="email" className="form-label text-neutral-900 fw-semibold mb-12">
+            {success && (
+              <div className="alert alert-success rounded-12 mb-24 border-0 d-flex align-items-center gap-12">
+                <i className="ph ph-check-circle text-xl"></i>
+                <span>{success}</span>
+              </div>
+            )}
+
+            {/* Auth Card */}
+            <div className="auth-card bg-white rounded-24 p-40 shadow-sm border-0">
+              {/* Login Form */}
+              {activeTab === 'login' && (
+                <form onSubmit={handleLoginSubmit}>
+                  <div className="mb-24">
+                    <label htmlFor="login_email" className="form-label text-neutral-900 fw-semibold mb-12">
                       <i className="ph ph-envelope me-8 text-main-600"></i>
                       Email Address <span className="text-danger">*</span>
                     </label>
                     <input
                       type="email"
                       className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
-                      id="email"
-                      placeholder="Enter your email address"
-                      value={registerData.email}
-                      onChange={handleRegisterChange}
+                      id="login_email"
+                      name="email"
+                      placeholder="Enter your email"
+                      value={loginData.email}
+                      onChange={handleLoginChange}
+                      autoComplete="email"
                       required
-                      style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
                     />
                   </div>
 
-                  <div className="col-12">
-                    <label htmlFor="password" className="form-label text-neutral-900 fw-semibold mb-12">
+                  <div className="mb-24">
+                    <label htmlFor="login_password" className="form-label text-neutral-900 fw-semibold mb-12">
                       <i className="ph ph-lock me-8 text-main-600"></i>
                       Password <span className="text-danger">*</span>
                     </label>
                     <div className="position-relative">
                       <input
-                        type={regPassVisible ? 'text' : 'password'}
+                        type={loginPassVisible ? 'text' : 'password'}
                         className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16 pe-56"
-                        id="password"
-                        placeholder="Create a strong password"
-                        value={registerData.password}
-                        onChange={handleRegisterChange}
+                        id="login_password"
+                        name="password"
+                        placeholder="Enter your password"
+                        value={loginData.password}
+                        onChange={handleLoginChange}
+                        autoComplete="current-password"
                         required
-                        style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
                       />
                       <button
                         type="button"
                         className="btn btn-link position-absolute top-50 end-0 translate-middle-y pe-20 text-gray-500"
-                        onClick={toggleRegPassVisibility}
+                        onClick={() => setLoginPassVisible(!loginPassVisible)}
                         style={{ border: 'none', background: 'none' }}
                       >
-                        <i className={`ph ph-${regPassVisible ? 'eye-slash' : 'eye'} text-xl`}></i>
+                        <i className={`ph ph-${loginPassVisible ? 'eye-slash' : 'eye'} text-xl`}></i>
                       </button>
                     </div>
                   </div>
 
-                  <div className="col-md-6">
-                    <label htmlFor="phone" className="form-label text-neutral-900 fw-semibold mb-12">
-                      <i className="ph ph-phone me-8 text-main-600"></i>
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
-                      id="phone"
-                      placeholder="Your phone number"
-                      value={registerData.phone}
-                      onChange={handleRegisterChange}
-                      style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
-                    />
+                  <div className="d-flex align-items-center justify-content-between mb-32">
+                    <div className="form-check">
+                      <input className="form-check-input" type="checkbox" id="remember_me" />
+                      <label className="form-check-label text-gray-600 ms-8" htmlFor="remember_me">
+                        Remember me
+                      </label>
+                    </div>
+                    <Link to="#" className="text-main-600 fw-semibold text-decoration-none">
+                      Forgot password?
+                    </Link>
                   </div>
 
-                  <div className="col-md-6">
-                    <label htmlFor="address.country" className="form-label text-neutral-900 fw-semibold mb-12">
-                      <i className="ph ph-globe me-8 text-main-600"></i>
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
-                      id="address.country"
-                      placeholder="Your country"
-                      value={registerData.address.country}
-                      onChange={handleRegisterChange}
-                      style={{ border: '2px solid #e5e7eb', transition: 'all 0.3s ease' }}
-                    />
-                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn btn-main btn-lg w-100 py-16 fw-bold rounded-12"
+                    disabled={authLoading}
+                    style={{ background: 'linear-gradient(135deg, #FA6400 0%, #FF8A3D 100%)' }}
+                  >
+                    {authLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-12"></span>
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ph ph-sign-in me-12"></i>
+                        Sign In
+                      </>
+                    )}
+                  </button>
 
-                  {/* Collapsible Address Section */}
-                  <div className="col-12">
+                  <p className="text-center mt-24 text-gray-600 mb-0">
+                    Don't have an account?{' '}
                     <button
                       type="button"
-                      className="btn btn-link p-0 text-main-600 fw-semibold text-decoration-none d-flex align-items-center"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#addressFields"
+                      className="btn btn-link p-0 text-main-600 fw-semibold"
+                      onClick={() => setActiveTab('register')}
                     >
-                      <i className="ph ph-plus me-8"></i>
-                      Add detailed address (optional)
+                      Create one now
                     </button>
-                    
-                    <div className="collapse mt-16" id="addressFields">
-                      <div className="row gy-16">
-                        <div className="col-12">
-                          <label htmlFor="address.street" className="form-label text-neutral-900 fw-semibold mb-8">
-                            Street Address
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control border-gray-200 rounded-12 px-16 py-12"
-                            id="address.street"
-                            placeholder="Street address"
-                            value={registerData.address.street}
-                            onChange={handleRegisterChange}
-                            style={{ border: '2px solid #e5e7eb' }}
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="address.city" className="form-label text-neutral-900 fw-semibold mb-8">
-                            City
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control border-gray-200 rounded-12 px-16 py-12"
-                            id="address.city"
-                            placeholder="City"
-                            value={registerData.address.city}
-                            onChange={handleRegisterChange}
-                            style={{ border: '2px solid #e5e7eb' }}
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="address.state" className="form-label text-neutral-900 fw-semibold mb-8">
-                            State/Province
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control border-gray-200 rounded-12 px-16 py-12"
-                            id="address.state"
-                            placeholder="State or province"
-                            value={registerData.address.state}
-                            onChange={handleRegisterChange}
-                            style={{ border: '2px solid #e5e7eb' }}
-                          />
-                        </div>
-                        <div className="col-md-6">
-                          <label htmlFor="address.zip" className="form-label text-neutral-900 fw-semibold mb-8">
-                            ZIP/Postal Code
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control border-gray-200 rounded-12 px-16 py-12"
-                            id="address.zip"
-                            placeholder="ZIP or postal code"
-                            value={registerData.address.zip}
-                            onChange={handleRegisterChange}
-                            style={{ border: '2px solid #e5e7eb' }}
-                          />
-                        </div>
+                  </p>
+                </form>
+              )}
+
+              {/* Register Form */}
+              {activeTab === 'register' && (
+                <form onSubmit={handleRegisterSubmit}>
+                  <div className="row">
+                    <div className="col-12 mb-24">
+                      <label htmlFor="reg_name" className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-user me-8 text-main-600"></i>
+                        Full Name <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
+                        id="reg_name"
+                        name="name"
+                        placeholder="Enter your full name"
+                        value={registerData.name}
+                        onChange={handleRegisterChange}
+                        autoComplete="name"
+                        required
+                      />
+                    </div>
+
+                    <div className="col-12 mb-24">
+                      <label htmlFor="reg_email" className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-envelope me-8 text-main-600"></i>
+                        Email Address <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
+                        id="reg_email"
+                        name="email"
+                        placeholder="Enter your email"
+                        value={registerData.email}
+                        onChange={handleRegisterChange}
+                        autoComplete="email"
+                        required
+                      />
+                    </div>
+
+                    <div className="col-md-6 mb-24">
+                      <label htmlFor="reg_password" className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-lock me-8 text-main-600"></i>
+                        Password <span className="text-danger">*</span>
+                      </label>
+                      <div className="position-relative">
+                        <input
+                          type={regPassVisible ? 'text' : 'password'}
+                          className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16 pe-56"
+                          id="reg_password"
+                          name="password"
+                          placeholder="Min. 6 characters"
+                          value={registerData.password}
+                          onChange={handleRegisterChange}
+                          autoComplete="new-password"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-link position-absolute top-50 end-0 translate-middle-y pe-20 text-gray-500"
+                          onClick={() => setRegPassVisible(!regPassVisible)}
+                          style={{ border: 'none', background: 'none' }}
+                        >
+                          <i className={`ph ph-${regPassVisible ? 'eye-slash' : 'eye'} text-xl`}></i>
+                        </button>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="mt-32 mb-24">
-                  <div className="form-check">
+                    <div className="col-md-6 mb-24">
+                      <label htmlFor="reg_confirm_password" className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-lock-key me-8 text-main-600"></i>
+                        Confirm Password <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
+                        id="reg_confirm_password"
+                        name="confirmPassword"
+                        placeholder="Confirm password"
+                        value={registerData.confirmPassword}
+                        onChange={handleRegisterChange}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </div>
+
+                    <div className="col-12 mb-24">
+                      <label htmlFor="reg_phone" className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-phone me-8 text-main-600"></i>
+                        Phone Number <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
+                        id="reg_phone"
+                        name="phone"
+                        placeholder="Enter your phone number"
+                        value={registerData.phone}
+                        onChange={handleRegisterChange}
+                        autoComplete="tel"
+                        required
+                      />
+                    </div>
+
+                    {/* Address Section */}
+                    <div className="col-12 mb-16">
+                      <label className="form-label text-neutral-900 fw-semibold mb-12">
+                        <i className="ph ph-map-pin me-8 text-main-600"></i>
+                        Address <span className="text-danger">*</span>
+                      </label>
+                    </div>
+
+                    <div className="col-12 mb-20">
+                      <input
+                        type="text"
+                        className="form-control form-control-lg border-gray-200 rounded-12 px-20 py-16"
+                        name="address_street"
+                        placeholder="Street Address *"
+                        value={registerData.address.street}
+                        onChange={handleRegisterChange}
+                        autoComplete="street-address"
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6 mb-20">
+                      <input
+                        type="text"
+                        className="form-control border-gray-200 rounded-12 px-16 py-14"
+                        name="address_city"
+                        placeholder="City *"
+                        value={registerData.address.city}
+                        onChange={handleRegisterChange}
+                        autoComplete="address-level2"
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6 mb-20">
+                      <input
+                        type="text"
+                        className="form-control border-gray-200 rounded-12 px-16 py-14"
+                        name="address_state"
+                        placeholder="State/Province *"
+                        value={registerData.address.state}
+                        onChange={handleRegisterChange}
+                        autoComplete="address-level1"
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6 mb-20">
+                      <input
+                        type="text"
+                        className="form-control border-gray-200 rounded-12 px-16 py-14"
+                        name="address_zip"
+                        placeholder="ZIP/Postal Code *"
+                        value={registerData.address.zip}
+                        onChange={handleRegisterChange}
+                        autoComplete="postal-code"
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6 mb-24">
+                      <input
+                        type="text"
+                        className="form-control border-gray-200 rounded-12 px-16 py-14"
+                        name="address_country"
+                        placeholder="Country *"
+                        value={registerData.address.country}
+                        onChange={handleRegisterChange}
+                        autoComplete="country-name"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-check mb-24">
                     <input
-                      className="form-check-input rounded"
+                      className="form-check-input"
                       type="checkbox"
-                      id="terms"
+                      id="agree_terms"
                       required
-                      style={{ borderColor: '#FA6400' }}
                     />
-                    <label className="form-check-label text-sm text-gray-600 ms-8" htmlFor="terms">
+                    <label className="form-check-label text-gray-600 ms-8" htmlFor="agree_terms">
                       I agree to the{' '}
-                      <Link to="#" className="text-main-600 text-decoration-none">
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link to="#" className="text-main-600 text-decoration-none">
-                        Privacy Policy
-                      </Link>
+                      <Link to="#" className="text-main-600">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link to="#" className="text-main-600">Privacy Policy</Link>
                     </label>
                   </div>
-                </div>
 
-                <button 
-                  type="submit" 
-                  className="btn btn-main btn-lg w-100 py-16 fw-bold rounded-12 shadow-sm"
-                  disabled={authLoading}
-                  style={{ background: 'linear-gradient(135deg, #FA6400 0%, #FF8A3D 100%)' }}
-                >
-                  {authLoading ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-12"></span>
-                      Creating Account...
-                    </>
-                  ) : (
-                    <>
-                      <i className="ph ph-user-plus me-12"></i>
-                      Create Account
-                    </>
-                  )}
-                </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-main btn-lg w-100 py-16 fw-bold rounded-12"
+                    disabled={authLoading}
+                    style={{ background: 'linear-gradient(135deg, #FA6400 0%, #FF8A3D 100%)' }}
+                  >
+                    {authLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-12"></span>
+                        Creating Account...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ph ph-user-plus me-12"></i>
+                        Create Account
+                      </>
+                    )}
+                  </button>
 
-                <div className="text-center mt-24">
-                  <p className="text-gray-600 mb-0">
-                    Already have an account? 
-                    <a href="#top" className="text-main-600 fw-semibold text-decoration-none ms-4">
+                  <p className="text-center mt-24 text-gray-600 mb-0">
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      className="btn btn-link p-0 text-main-600 fw-semibold"
+                      onClick={() => setActiveTab('login')}
+                    >
                       Sign in instead
-                    </a>
+                    </button>
                   </p>
-                </div>
-              </div>
-            </form>
+                </form>
+              )}
+            </div>
           </div>
-          {/* Register Card End */}
         </div>
       </div>
     </section>
